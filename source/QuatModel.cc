@@ -740,10 +740,15 @@ void QuatModel::Initialize(std::shared_ptr<tbox::MemoryDatabase>& input_db,
        d_quat_grad_side_id, d_weight_id, d_f_l_id, d_f_a_id, d_temperature_id,
        d_energy_diag_id));
 
-   if (d_model_parameters.withMultipleOrderP())
+   if (d_model_parameters.withMultipleOrderP()) {
       d_multiorderp_energy.reset(new MultiOrderPEnergyEvaluationStrategy(
           d_model_parameters, d_phase_scratch_id, d_weight_id,
           d_energy_diag_id));
+
+      d_rigid_body_forces.reset(new RigidBodyForces(d_model_parameters,
+                                                    d_phase_scratch_id,
+                                                    d_weight_id));
+   }
 
    math::HierarchyCellDataOpsReal<double> cellops(d_patch_hierarchy);
 
@@ -4695,6 +4700,14 @@ void QuatModel::evaluateEnergy(
    if (d_model_parameters.withMultipleOrderP()) {
       d_multiorderp_energy->evaluatePairEnergy(hierarchy);
       d_multiorderp_energy->printPairEnergy(tbox::plog);
+
+      const tbox::SAMRAI_MPI& mpi(tbox::SAMRAI_MPI::getSAMRAIWorld());
+      mpi.Barrier();
+
+      d_rigid_body_forces->evaluatePairForces(hierarchy);
+      d_rigid_body_forces->printPairForces(tbox::plog);
+
+      mpi.Barrier();
    }
 }
 
